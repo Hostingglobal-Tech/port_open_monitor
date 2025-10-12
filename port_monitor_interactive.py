@@ -27,9 +27,10 @@ import threading
 console = Console()
 
 class InteractivePortMonitor:
-    def __init__(self):
-        self.port_range = (3000, 9000)
-        self.sudo_password = "ak@5406454"
+    def __init__(self, start_port=3000, end_port=9000):
+        self.port_range = (start_port, end_port)
+        # sudo 비밀번호는 환경변수 SUDO_PASSWORD에서 가져오기
+        self.sudo_password = os.getenv('SUDO_PASSWORD', '')
         self.running = True
         self.ports_info = []
         self.hidden_ports = set()  # 숨긴 포트 목록
@@ -134,7 +135,7 @@ class InteractivePortMonitor:
         console.clear()
         
         # 헤더
-        console.print(Panel("🔄 Port Monitor (3000-9000)", style="bold cyan"))
+        console.print(Panel(f"🔄 Port Monitor ({self.port_range[0]}-{self.port_range[1]})", style="bold cyan"))
         
         # 현재 시간
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -148,15 +149,15 @@ class InteractivePortMonitor:
             console.print(f"[yellow]Hidden ports: {', '.join(map(str, sorted(self.hidden_ports)))}[/yellow]")
             console.print(f"[dim]Press 'u' to unhide all, or 's' + number to show specific port[/dim]\n")
         
-        # 테이블
+        # 테이블 - PID를 No. 바로 다음에 배치
         table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("No.", style="bold white", width=5)
-        table.add_column("Port", style="cyan", width=8)
-        table.add_column("Project Folder", style="bold green", width=35)
-        table.add_column("PID", style="yellow", width=10)  # 8 -> 10으로 증가
-        table.add_column("Process", style="blue", width=20)  # 25 -> 20으로 감소
-        table.add_column("Memory", style="red", width=12)  # 10 -> 12로 증가
-        table.add_column("User", style="magenta", width=12)
+        table.add_column("No.", style="bold white", min_width=3, no_wrap=True)      # 번호는 절대 잘리지 않음
+        table.add_column("PID", style="yellow", min_width=8, no_wrap=True)          # PID는 No. 바로 다음, 절대 잘리지 않음
+        table.add_column("Port", style="cyan", min_width=5, no_wrap=True)           # 포트 번호도 잘리지 않음
+        table.add_column("Project Folder", style="bold green", width=30)            # 프로젝트 폴더는 좀 더 작게
+        table.add_column("Process", style="blue", width=18)                         # 프로세스명은 조금 더 작게
+        table.add_column("Memory", style="red", width=10)                           # 메모리 정보
+        table.add_column("User", style="magenta", width=10)                         # 사용자명
         
         for idx, port in enumerate(sorted(visible_ports, key=lambda x: x['port']), 1):
             if port['project_folder'] != 'Unknown':
@@ -166,10 +167,10 @@ class InteractivePortMonitor:
             
             table.add_row(
                 str(idx),
+                str(port['pid']) if port['pid'] else "N/A",
                 str(port['port']),
                 folder_display,
-                str(port['pid']) if port['pid'] else "N/A",
-                port['process_name'][:20],  # 25 -> 20으로 조정
+                port['process_name'][:18] if len(port['process_name']) > 18 else port['process_name'],  # 18자로 제한
                 str(port['memory']),
                 port['user']
             )
@@ -208,6 +209,38 @@ class InteractivePortMonitor:
         if sys.stdin in select.select([sys.stdin], [], [], timeout)[0]:
             return sys.stdin.read(1)
         return None
+
+    
+    def get_multi_char_input(self, prompt_text: str, timeout: int = 10) -> str:
+        """멀티 문자 입력을 받는 함수"""
+        sys.stdout.write('\r\033[K')
+        sys.stdout.write(prompt_text)
+        sys.stdout.flush()
+        
+        input_text = ""
+        start_time = time.time()
+        
+        while True:
+            if time.time() - start_time > timeout:
+                break
+                
+            char = self.get_non_blocking_input(0.1)
+            if char == '\n' or char == '\r':
+                break
+            elif char and char.isdigit():
+                input_text += char
+                sys.stdout.write(char)
+                sys.stdout.flush()
+            elif char == '\x7f' or char == '\b':  # backspace
+                if input_text:
+                    input_text = input_text[:-1]
+                    sys.stdout.write('\b \b')
+                    sys.stdout.flush()
+            elif char and char.isalpha():
+                # 알파벳이 입력되면 즉시 종료 (q, r, h, u, s 등의 명령어)
+                return char
+        
+        return input_text
     
     def interactive_monitor(self, interval=60):
         """대화형 자동 모니터링"""
@@ -242,7 +275,7 @@ class InteractivePortMonitor:
                 if countdown > 0:
                     # 커서를 줄 처음으로 이동하고 줄 전체 지우기
                     sys.stdout.write('\r\033[K')
-                    sys.stdout.write(f"[Auto refresh in {countdown}s] 1-9:kill, h:hide, u:unhide, s:show, r:refresh, q:quit")
+                    sys.stdout.write(f"[Auto refresh in {countdown}s] Enter number to kill, h:hide, u:unhide, s:show, r:refresh, q:quit")
                     sys.stdout.flush()
                     countdown -= 1
                 
@@ -267,25 +300,19 @@ class InteractivePortMonitor:
                     elif user_input.lower() == 'h':
                         # Hide 모드 - 다음 입력을 기다림
                         sys.stdout.write('\r\033[K')
-                        sys.stdout.write("Enter port number to hide (or 'c' to cancel): ")
                         sys.stdout.flush()
                         
-                        hide_input = None
-                        while not hide_input:
-                            if is_terminal:
-                                hide_input = self.get_non_blocking_input(5)
-                            else:
-                                break
-                        
-                        if hide_input and hide_input.isdigit():
-                            hide_idx = int(hide_input) - 1
-                            visible_ports = [p for p in self.ports_info if p['port'] not in self.hidden_ports]
-                            if 0 <= hide_idx < len(visible_ports):
-                                sorted_ports = sorted(visible_ports, key=lambda x: x['port'])
-                                port_to_hide = sorted_ports[hide_idx]['port']
-                                self.hidden_ports.add(port_to_hide)
-                                console.print(f"\n[yellow]Hidden port {port_to_hide}[/yellow]")
-                                time.sleep(1)
+                        if is_terminal:
+                            hide_input = self.get_multi_char_input("Enter port number to hide: ")
+                            if hide_input and hide_input.isdigit():
+                                hide_idx = int(hide_input) - 1
+                                visible_ports = [p for p in self.ports_info if p['port'] not in self.hidden_ports]
+                                if 0 <= hide_idx < len(visible_ports):
+                                    sorted_ports = sorted(visible_ports, key=lambda x: x['port'])
+                                    port_to_hide = sorted_ports[hide_idx]['port']
+                                    self.hidden_ports.add(port_to_hide)
+                                    console.print(f"\n[yellow]Hidden port {port_to_hide}[/yellow]")
+                                    time.sleep(1)
                         
                         # 갱신
                         self.display_ports_with_actions(self.ports_info)
@@ -301,44 +328,74 @@ class InteractivePortMonitor:
                     elif user_input.lower() == 's':
                         # Show specific port
                         sys.stdout.write('\r\033[K')
-                        sys.stdout.write("Enter port number to show: ")
                         sys.stdout.flush()
                         
-                        show_input = None
-                        while not show_input:
-                            if is_terminal:
-                                show_input = self.get_non_blocking_input(5)
-                            else:
-                                break
-                        
-                        if show_input and show_input.isdigit():
-                            port_to_show = int(show_input)
-                            if port_to_show in self.hidden_ports:
-                                self.hidden_ports.remove(port_to_show)
-                                console.print(f"\n[green]Showing port {port_to_show}[/green]")
-                                time.sleep(1)
-                                self.display_ports_with_actions(self.ports_info)
+                        if is_terminal:
+                            show_input = self.get_multi_char_input("Enter port number to show: ")
+                            if show_input and show_input.isdigit():
+                                port_to_show = int(show_input)
+                                if port_to_show in self.hidden_ports:
+                                    self.hidden_ports.remove(port_to_show)
+                                    console.print(f"\n[green]Showing port {port_to_show}[/green]")
+                                    time.sleep(1)
+                                    self.display_ports_with_actions(self.ports_info)
                         countdown = interval
                     elif user_input.isdigit():
-                        idx = int(user_input) - 1
-                        visible_ports = [p for p in self.ports_info if p['port'] not in self.hidden_ports]
-                        if 0 <= idx < len(visible_ports):
-                            sorted_ports = sorted(visible_ports, key=lambda x: x['port'])
-                            selected = sorted_ports[idx]
+                        # Kill 모드 - 숫자로 시작하면 전체 번호 입력받기
+                        sys.stdout.write('\r\033[K')
+                        
+                        if is_terminal:
+                            # 첫 번째 숫자와 함께 나머지 숫자들을 입력받기
+                            remaining_input = self.get_multi_char_input(f"Enter process number to kill (started with {user_input}): ")
                             
-                            if selected['pid']:
-                                console.print(f"\n\n[yellow]Killing {selected['project_folder']} on port {selected['port']} (PID: {selected['pid']})...[/yellow]")
-                                self.kill_process(selected['pid'])
-                                time.sleep(2)
+                            # 알파벳이 입력된 경우 (명령어) 처리
+                            if remaining_input and remaining_input.isalpha():
+                                # 알파벳 명령어로 다시 처리
+                                if remaining_input.lower() == 'q':
+                                    console.print("\n[yellow]Exiting...[/yellow]")
+                                    break
+                                elif remaining_input.lower() == 'r':
+                                    self.ports_info = self.get_open_ports()
+                                    self.display_ports_with_actions(self.ports_info)
+                                    last_update = time.time()
+                                    countdown = interval
+                                    continue
+                                # 다른 명령어들도 여기서 처리 가능
+                            
+                            # 숫자 조합 생성
+                            if remaining_input and remaining_input.isdigit():
+                                kill_input = user_input + remaining_input
+                            elif not remaining_input:  # 엔터만 눌렀을 경우
+                                kill_input = user_input
+                            else:
+                                kill_input = user_input  # 잘못된 입력은 첫 번째 숫자만 사용
+                        else:
+                            kill_input = user_input
+                        
+                        if kill_input and kill_input.isdigit():
+                            idx = int(kill_input) - 1
+                            visible_ports = [p for p in self.ports_info if p['port'] not in self.hidden_ports]
+                            if 0 <= idx < len(visible_ports):
+                                sorted_ports = sorted(visible_ports, key=lambda x: x['port'])
+                                selected = sorted_ports[idx]
                                 
-                                # 갱신
-                                self.ports_info = self.get_open_ports()
+                                if selected['pid']:
+                                    console.print(f"\n\n[yellow]Killing {selected['project_folder']} on port {selected['port']} (PID: {selected['pid']})...[/yellow]")
+                                    self.kill_process(selected['pid'])
+                                    time.sleep(2)
+                                    
+                                    # 갱신
+                                    self.ports_info = self.get_open_ports()
+                                    self.display_ports_with_actions(self.ports_info)
+                                    last_update = time.time()
+                                    countdown = interval
+                            else:
+                                console.print(f"\n[red]Invalid selection: {kill_input}. Available range: 1-{len(visible_ports)}[/red]")
+                                time.sleep(1)
                                 self.display_ports_with_actions(self.ports_info)
-                                last_update = time.time()
                                 countdown = interval
                         else:
-                            console.print(f"\n[red]Invalid selection: {user_input}[/red]")
-                            time.sleep(1)
+                            # 갱신만 하고 계속
                             self.display_ports_with_actions(self.ports_info)
                             countdown = interval
                 
@@ -360,10 +417,12 @@ def main():
     
     parser = argparse.ArgumentParser(description="Interactive Port Monitor with Kill Feature")
     parser.add_argument('-t', '--interval', type=int, default=60, help='Refresh interval in seconds (default: 60)')
+    parser.add_argument('--start-port', type=int, default=3000, help='Start of port range to monitor (default: 3000)')
+    parser.add_argument('--end-port', type=int, default=9000, help='End of port range to monitor (default: 9000)')
     
     args = parser.parse_args()
     
-    monitor = InteractivePortMonitor()
+    monitor = InteractivePortMonitor(args.start_port, args.end_port)
     
     # 초기 표시
     ports_info = monitor.get_open_ports()

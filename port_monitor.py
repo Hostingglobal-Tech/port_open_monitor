@@ -20,8 +20,10 @@ from rich import print as rprint
 console = Console()
 
 class PortMonitor:
-    def __init__(self):
-        self.port_range = (3000, 9000)
+    def __init__(self, start_port=3000, end_port=9000):
+        self.port_range = (start_port, end_port)
+        # sudo 비밀번호는 환경변수 SUDO_PASSWORD에서 가져오기
+        self.sudo_password = os.getenv('SUDO_PASSWORD', '')
         self.project_mappings = self.detect_project_mappings()
         
     def detect_project_mappings(self) -> Dict[int, str]:
@@ -48,10 +50,8 @@ class PortMonitor:
     def get_open_ports(self) -> List[Dict]:
         """열려있는 포트 정보 수집"""
         try:
-            # sudo 비밀번호를 환경변수나 입력으로 받음
-            sudo_password = "ak@5406454"
-            
-            cmd = f"echo '{sudo_password}' | sudo -S ss -tulnp '( sport >= :{self.port_range[0]} and sport <= :{self.port_range[1]} )'"
+            # sudo 비밀번호를 사용하여 ss 명령 실행
+            cmd = f"echo '{self.sudo_password}' | sudo -S ss -tulnp '( sport >= :{self.port_range[0]} and sport <= :{self.port_range[1]} )'"
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
             
             if result.returncode != 0:
@@ -159,7 +159,7 @@ class PortMonitor:
     
     def display_ports(self, ports_info: List[Dict]):
         """포트 정보를 테이블로 표시"""
-        table = Table(title="🔍 Port Monitor (3000-9000)", show_header=True, header_style="bold magenta")
+        table = Table(title=f"🔍 Port Monitor ({self.port_range[0]}-{self.port_range[1]})", show_header=True, header_style="bold magenta")
         table.add_column("Port", style="cyan", width=8)
         table.add_column("Protocol", style="green", width=10)
         table.add_column("PID", style="yellow", width=10)
@@ -209,8 +209,7 @@ class PortMonitor:
         except PermissionError:
             # sudo로 재시도
             try:
-                sudo_password = "ak@5406454"
-                cmd = f"echo '{sudo_password}' | sudo -S kill -15 {pid}"
+                cmd = f"echo '{self.sudo_password}' | sudo -S kill -15 {pid}"
                 subprocess.run(cmd, shell=True, check=True)
                 console.print(f"[green]Killed process {pid} with sudo[/green]")
                 return True
@@ -231,7 +230,7 @@ class PortMonitor:
             ports_info = self.get_open_ports()
             
             if not ports_info:
-                console.print("[yellow]No ports found in range 3000-9000[/yellow]")
+                console.print(f"[yellow]No ports found in range {self.port_range[0]}-{self.port_range[1]}[/yellow]")
             else:
                 self.display_ports(ports_info)
             
@@ -308,7 +307,7 @@ class PortMonitor:
         ports_info = self.get_open_ports()
         
         if not ports_info:
-            console.print("[yellow]No ports found in range 3000-9000[/yellow]")
+            console.print(f"[yellow]No ports found in range {self.port_range[0]}-{self.port_range[1]}[/yellow]")
         else:
             self.display_ports(ports_info)
             
@@ -339,14 +338,16 @@ def main():
     """메인 함수"""
     import argparse
     
-    parser = argparse.ArgumentParser(description="Port Monitor (3000-9000)")
+    parser = argparse.ArgumentParser(description="Port Monitor - Monitor TCP ports for running processes")
     parser.add_argument('-i', '--interactive', action='store_true', help='Run in interactive mode')
     parser.add_argument('-k', '--kill', type=int, help='Kill process by PID')
     parser.add_argument('-p', '--port', type=int, help='Kill process by port')
+    parser.add_argument('--start-port', type=int, default=3000, help='Start of port range to monitor (default: 3000)')
+    parser.add_argument('--end-port', type=int, default=9000, help='End of port range to monitor (default: 9000)')
     
     args = parser.parse_args()
     
-    monitor = PortMonitor()
+    monitor = PortMonitor(args.start_port, args.end_port)
     
     if args.kill:
         monitor.kill_process(args.kill)

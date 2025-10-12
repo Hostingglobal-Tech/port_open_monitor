@@ -25,9 +25,10 @@ import time
 console = Console()
 
 class EnhancedPortMonitor:
-    def __init__(self):
-        self.port_range = (3000, 9000)
-        self.sudo_password = "ak@5406454"
+    def __init__(self, start_port=3000, end_port=9000):
+        self.port_range = (start_port, end_port)
+        # sudo 비밀번호는 환경변수 SUDO_PASSWORD에서 가져오기
+        self.sudo_password = os.getenv('SUDO_PASSWORD', '')
         
     def get_open_ports(self) -> List[Dict]:
         """열려있는 포트 정보 수집"""
@@ -133,7 +134,7 @@ class EnhancedPortMonitor:
     
     def display_ports_with_actions(self, ports_info: List[Dict]):
         """포트 정보를 테이블로 표시 (액션 번호 포함)"""
-        table = Table(title="🔍 Enhanced Port Monitor (3000-9000)", show_header=True, header_style="bold magenta")
+        table = Table(title=f"🔍 Enhanced Port Monitor ({self.port_range[0]}-{self.port_range[1]})", show_header=True, header_style="bold magenta")
         table.add_column("No.", style="bold white", width=5)
         table.add_column("Port", style="cyan", width=8)
         table.add_column("Project Folder", style="bold green", width=35)
@@ -201,7 +202,7 @@ class EnhancedPortMonitor:
             ports_info = self.get_open_ports()
             
             if not ports_info:
-                console.print("[yellow]No ports found in range 3000-9000[/yellow]")
+                console.print(f"[yellow]No ports found in range {self.port_range[0]}-{self.port_range[1]}[/yellow]")
                 if Confirm.ask("\nRefresh?", default=True):
                     continue
                 else:
@@ -362,7 +363,7 @@ class EnhancedPortMonitor:
                 ports_info = self.get_open_ports()
                 
                 if not ports_info:
-                    console.print("[yellow]No ports found in range 3000-9000[/yellow]")
+                    console.print(f"[yellow]No ports found in range {self.port_range[0]}-{self.port_range[1]}[/yellow]")
                 else:
                     self.display_ports_with_actions(ports_info)
                 
@@ -382,15 +383,17 @@ def main():
     """메인 함수"""
     import argparse
     
-    parser = argparse.ArgumentParser(description="Enhanced Port Monitor (3000-9000)")
+    parser = argparse.ArgumentParser(description="Enhanced Port Monitor - Monitor TCP ports for running processes")
     parser.add_argument('-i', '--interactive', action='store_true', help='Run in interactive mode')
     parser.add_argument('-q', '--quick', action='store_true', help='Quick view with kill option')
     parser.add_argument('-m', '--monitor', action='store_true', help='Auto monitor mode (1 minute interval)')
     parser.add_argument('-t', '--interval', type=int, default=60, help='Monitor interval in seconds (default: 60)')
+    parser.add_argument('--start-port', type=int, default=3000, help='Start of port range to monitor (default: 3000)')
+    parser.add_argument('--end-port', type=int, default=9000, help='End of port range to monitor (default: 9000)')
     
     args = parser.parse_args()
     
-    monitor = EnhancedPortMonitor()
+    monitor = EnhancedPortMonitor(args.start_port, args.end_port)
     
     try:
         if args.monitor:
