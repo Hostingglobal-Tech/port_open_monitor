@@ -88,14 +88,18 @@ Python 3.14의 free-threading (GIL 비활성화) 기능을 활용한 고성능 �
 **간편 명령어 (bashrc alias):**
 ```bash
 # ~/.bashrc에 설정된 alias 사용 (python3 = 3.14t)
-pmft          # Free-threading 포트 모니터 실행
+pmft          # Free-threading 포트 모니터 실행 (60초 자동 갱신)
+pmft -t 30    # 30초마다 자동 갱신
 pmft-bench    # 성능 벤치마크 (순차 vs 병렬 비교)
 ```
 
 **직접 실행:**
 ```bash
-# 기본 실행 (자동으로 최적 방식 선택)
+# 기본 실행 (60초 자동 갱신 + 카운트다운)
 python3 port_monitor_freethreading.py
+
+# 빠른 갱신 (30초 간격)
+python3 port_monitor_freethreading.py -t 30
 
 # 성능 벤치마크 (순차 vs 병렬 비교)
 python3 port_monitor_freethreading.py --benchmark
@@ -110,11 +114,24 @@ python3 port_monitor_freethreading.py --sequential
 ./test_freethreading.sh
 ```
 
+**⏱️ 실시간 카운트다운 기능:**
+```
+[Auto refresh in 59s] Enter number to kill, h:hide, r:refresh, q:quit
+```
+
+**키보드 명령어 (실행 중 입력):**
+- **숫자 입력**: 해당 번호 프로세스 즉시 종료
+- **h**: 프로세스 숨기기 (화면에서 제외)
+- **r**: 즉시 갱신 (카운트다운 리셋)
+- **q**: 프로그램 종료
+
 **주요 특징:**
 - ✅ GIL 자동 감지 및 최적화
 - ⚡ ThreadPoolExecutor로 프로세스 정보 병렬 수집
-- 📊 실시간 성능 벤치마크 기능
+- ⏱️ 실시간 카운트다운 + 자동 갱신
 - 🎯 CPU 코어 수에 따른 자동 워커 조정
+- 📊 실시간 성능 벤치마크 기능
+- 👁️ 프로세스 숨기기 기능
 
 **설치 방법:**
 ```bash
