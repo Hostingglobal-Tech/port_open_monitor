@@ -12,6 +12,9 @@ import psutil
 import signal
 import sysconfig
 import time
+import select
+import termios
+import tty
 from typing import List, Dict, Optional
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -260,11 +263,17 @@ class FreeThreadingPortMonitor:
 
         return Path(cwd).name if cwd else 'Unknown'
 
-    def display_ports_with_actions(self, ports_info: List[Dict], elapsed_time: float):
+    def display_ports_with_actions(self, ports_info: List[Dict]):
         """포트 정보를 테이블로 표시"""
+        console.clear()
+
         # 헤더 정보
         header_text = f"🚀 Port Monitor ({self.port_range[0]}-{self.port_range[1]})"
         console.print(Panel(header_text, style="bold cyan"))
+
+        # 타임스탬프
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        console.print(f"[dim]Last updated: {timestamp}[/dim]\n")
 
         # 테이블
         table = Table(show_header=True, header_style="bold magenta")
@@ -294,6 +303,8 @@ class FreeThreadingPortMonitor:
 
         console.print(table)
         console.print(f"\n[bold]Total ports in use:[/bold] {len(ports_info)}")
+        console.print("")  # 카운트다운과 구분용 빈 줄
+
         return ports_info
 
     def kill_process(self, pid: int, force: bool = False) -> bool:
@@ -380,66 +391,197 @@ class FreeThreadingPortMonitor:
 
         console.print("="*70 + "\n")
 
-    def quick_view(self):
-        """빠른 보기 모드"""
-        hidden_pids = set()
+    def get_non_blocking_input(self, timeout=1):
+        """비차단 입력 받기"""
+        if sys.stdin in select.select([sys.stdin], [], [], timeout)[0]:
+            return sys.stdin.read(1)
+        return None
+
+    def get_multi_char_input(self, prompt_text: str, timeout: int = 10) -> str:
+        """멀티 문자 입력을 받는 함수"""
+        sys.stdout.write('\r\033[K')
+        sys.stdout.write(prompt_text)
+        sys.stdout.flush()
+
+        input_text = ""
+        start_time = time.time()
 
         while True:
-            ports_info, elapsed = self.get_open_ports()
-
-            if not ports_info:
-                console.print(f"[yellow]No ports found in range {self.port_range[0]}-{self.port_range[1]}[/yellow]")
-                return
-
-            # 숨긴 프로세스 제외
-            visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
-
-            if not visible_ports:
-                console.print("[yellow]모든 프로세스가 숨겨졌습니다.[/yellow]")
-                if Confirm.ask("숨김 목록을 초기화하시겠습니까?"):
-                    hidden_pids.clear()
-                    continue
-                return
-
-            self.display_ports_with_actions(visible_ports, elapsed)
-
-            if not sys.stdin.isatty():
-                return
-
-            # 메뉴
-            console.print("\n[bold cyan]옵션:[/bold cyan]")
-            console.print("1. 프로세스 숨기기")
-            console.print("2. 프로세스 종료")
-            console.print("3. 프로그램 종료")
-
-            choice = Prompt.ask("[bold yellow]선택[/bold yellow]", choices=["1", "2", "3"], default="3")
-
-            if choice == "1":
-                idx = Prompt.ask("숨길 프로세스 번호")
-                try:
-                    idx = int(idx) - 1
-                    if 0 <= idx < len(visible_ports):
-                        sorted_ports = sorted(visible_ports, key=lambda x: x['port'])
-                        selected = sorted_ports[idx]
-                        if selected['pid']:
-                            hidden_pids.add(selected['pid'])
-                            console.print(f"[green]✓ PID {selected['pid']} ({selected['project_folder']}) 숨김 처리됨[/green]")
-                except ValueError:
-                    console.print("[red]잘못된 입력[/red]")
-            elif choice == "2":
-                idx = Prompt.ask("종료할 프로세스 번호")
-                try:
-                    idx = int(idx) - 1
-                    if 0 <= idx < len(visible_ports):
-                        sorted_ports = sorted(visible_ports, key=lambda x: x['port'])
-                        selected = sorted_ports[idx]
-                        if selected['pid']:
-                            if Confirm.ask(f"[{selected['project_folder']}] 프로세스 종료 (PID: {selected['pid']})?"):
-                                self.kill_process(selected['pid'])
-                except ValueError:
-                    console.print("[red]잘못된 입력[/red]")
-            elif choice == "3":
+            if time.time() - start_time > timeout:
                 break
+
+            char = self.get_non_blocking_input(0.1)
+            if char == '\n' or char == '\r':
+                break
+            elif char and char.isdigit():
+                input_text += char
+                sys.stdout.write(char)
+                sys.stdout.flush()
+            elif char == '\x7f' or char == '\b':  # backspace
+                if input_text:
+                    input_text = input_text[:-1]
+                    sys.stdout.write('\b \b')
+                    sys.stdout.flush()
+            elif char and char.isalpha():
+                # 알파벳이 입력되면 즉시 종료 (q, r, h 등의 명령어)
+                return char
+
+        return input_text
+
+    def quick_view(self, interval=60):
+        """자동 갱신 모드 (카운트다운 포함)"""
+        # 터미널 설정 저장
+        old_settings = None
+        is_terminal = sys.stdin.isatty()
+
+        if is_terminal:
+            try:
+                old_settings = termios.tcgetattr(sys.stdin)
+                tty.setcbreak(sys.stdin.fileno())
+            except:
+                is_terminal = False
+
+        try:
+            hidden_pids = set()
+            last_update = 0
+            countdown = interval
+
+            # 초기 화면 표시
+            ports_info, _ = self.get_open_ports()
+            visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
+            if visible_ports or not hidden_pids:
+                self.display_ports_with_actions(visible_ports)
+                last_update = time.time()
+
+            while True:
+                current_time = time.time()
+
+                # 갱신 시간 체크
+                if current_time - last_update >= interval:
+                    ports_info, _ = self.get_open_ports()
+                    visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
+
+                    if not visible_ports and not hidden_pids:
+                        console.print(f"[yellow]No ports found in range {self.port_range[0]}-{self.port_range[1]}[/yellow]")
+                        time.sleep(2)
+                        continue
+
+                    self.display_ports_with_actions(visible_ports)
+                    last_update = current_time
+                    countdown = interval
+
+                # 카운트다운 표시 (매 초마다 업데이트)
+                if countdown > 0:
+                    sys.stdout.write('\r\033[K')
+                    sys.stdout.write(f"[Auto refresh in {countdown}s] Enter number to kill, h:hide, r:refresh, q:quit")
+                    sys.stdout.flush()
+                    countdown -= 1
+
+                # 입력 체크 (터미널 환경에서만)
+                user_input = None
+                if is_terminal:
+                    user_input = self.get_non_blocking_input(1)
+                else:
+                    time.sleep(1)
+
+                if user_input:
+                    if user_input.lower() == 'q':
+                        console.print("\n[yellow]Exiting...[/yellow]")
+                        break
+                    elif user_input.lower() == 'r':
+                        # 즉시 갱신
+                        ports_info, _ = self.get_open_ports()
+                        visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
+                        self.display_ports_with_actions(visible_ports)
+                        last_update = time.time()
+                        countdown = interval
+                    elif user_input.lower() == 'h':
+                        # Hide 모드
+                        sys.stdout.write('\r\033[K')
+                        sys.stdout.flush()
+
+                        if is_terminal:
+                            hide_input = self.get_multi_char_input("Enter process number to hide: ")
+                            if hide_input and hide_input.isdigit():
+                                hide_idx = int(hide_input) - 1
+                                if 0 <= hide_idx < len(visible_ports):
+                                    sorted_ports = sorted(visible_ports, key=lambda x: x['port'])
+                                    pid_to_hide = sorted_ports[hide_idx]['pid']
+                                    if pid_to_hide:
+                                        hidden_pids.add(pid_to_hide)
+                                        console.print(f"\n[yellow]Hidden PID {pid_to_hide}[/yellow]")
+                                        time.sleep(1)
+
+                        # 갱신
+                        ports_info, _ = self.get_open_ports()
+                        visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
+                        self.display_ports_with_actions(visible_ports)
+                        countdown = interval
+                    elif user_input.isdigit():
+                        # Kill 모드 - 숫자로 시작하면 전체 번호 입력받기
+                        sys.stdout.write('\r\033[K')
+
+                        if is_terminal:
+                            remaining_input = self.get_multi_char_input(f"Enter process number to kill (started with {user_input}): ")
+
+                            # 알파벳이 입력된 경우 (명령어) 처리
+                            if remaining_input and remaining_input.isalpha():
+                                if remaining_input.lower() == 'q':
+                                    console.print("\n[yellow]Exiting...[/yellow]")
+                                    break
+                                elif remaining_input.lower() == 'r':
+                                    ports_info, _ = self.get_open_ports()
+                                    visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
+                                    self.display_ports_with_actions(visible_ports)
+                                    last_update = time.time()
+                                    countdown = interval
+                                    continue
+
+                            # 숫자 조합 생성
+                            if remaining_input and remaining_input.isdigit():
+                                kill_input = user_input + remaining_input
+                            elif not remaining_input:  # 엔터만 눌렀을 경우
+                                kill_input = user_input
+                            else:
+                                kill_input = user_input
+                        else:
+                            kill_input = user_input
+
+                        if kill_input and kill_input.isdigit():
+                            idx = int(kill_input) - 1
+                            if 0 <= idx < len(visible_ports):
+                                sorted_ports = sorted(visible_ports, key=lambda x: x['port'])
+                                selected = sorted_ports[idx]
+
+                                if selected['pid']:
+                                    console.print(f"\n\n[yellow]Killing {selected['project_folder']} on port {selected['port']} (PID: {selected['pid']})...[/yellow]")
+                                    self.kill_process(selected['pid'])
+                                    time.sleep(2)
+
+                                    # 갱신
+                                    ports_info, _ = self.get_open_ports()
+                                    visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
+                                    self.display_ports_with_actions(visible_ports)
+                                    last_update = time.time()
+                                    countdown = interval
+                            else:
+                                console.print(f"\n[red]Invalid selection: {kill_input}[/red]")
+                                time.sleep(1)
+                                ports_info, _ = self.get_open_ports()
+                                visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
+                                self.display_ports_with_actions(visible_ports)
+                                countdown = interval
+
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Interrupted by user[/yellow]")
+        finally:
+            # 터미널 설정 복원
+            if old_settings:
+                try:
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+                except:
+                    pass
+            console.print("\n")
 
 
 def main():
@@ -451,13 +593,15 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 예제:
-  %(prog)s                    # 기본 포트 모니터링
+  %(prog)s                    # 기본 포트 모니터링 (60초 자동 갱신)
+  %(prog)s -t 30              # 30초마다 자동 갱신
   %(prog)s --benchmark        # 성능 벤치마크 실행
   %(prog)s --parallel         # 강제로 병렬 처리 사용
   %(prog)s --sequential       # 강제로 순차 처리 사용
         """
     )
     parser.add_argument('-b', '--benchmark', action='store_true', help='성능 벤치마크 실행')
+    parser.add_argument('-t', '--interval', type=int, default=60, help='자동 갱신 주기(초) (기본: 60)')
     parser.add_argument('--parallel', action='store_true', help='병렬 처리 강제 사용')
     parser.add_argument('--sequential', action='store_true', help='순차 처리 강제 사용')
     parser.add_argument('--start-port', type=int, default=3000, help='시작 포트 (기본: 3000)')
@@ -471,7 +615,8 @@ def main():
         if args.benchmark:
             # 먼저 한 번 표시
             ports_info, elapsed = monitor.get_open_ports()
-            monitor.display_ports_with_actions(ports_info, elapsed)
+            monitor.display_ports_with_actions(ports_info)
+            console.print(f"\n[bold]포트 정보 수집 시간:[/bold] {elapsed:.3f}초\n")
             # 벤치마크 실행
             monitor.benchmark_comparison()
         else:
@@ -482,8 +627,8 @@ def main():
             elif args.sequential:
                 use_parallel = False
 
-            # 일회성 모니터링
-            monitor.quick_view()
+            # 자동 갱신 모니터링
+            monitor.quick_view(interval=args.interval)
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted by user[/yellow]")
