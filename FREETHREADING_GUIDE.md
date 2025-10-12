@@ -20,7 +20,7 @@ Python 3.14의 free-threading 기능을 활용하여 포트 모니터링 성능�
 pyenv install 3.14.0t  # 't'는 free-threading을 의미
 
 # 설치 확인
-python3.14t --version
+python3 --version
 ```
 
 ### 필수 패키지
@@ -35,7 +35,7 @@ pip install --break-system-packages psutil rich
 
 ```bash
 # Python 3.14t (free-threading 빌드)로 실행
-python3.14t port_monitor_freethreading.py
+python3 port_monitor_freethreading.py
 
 # 일반 Python으로 실행 (순차 처리)
 python3 port_monitor_freethreading.py
@@ -49,7 +49,7 @@ python3 port_monitor_freethreading.py
 
 ```bash
 # 순차 vs 병렬 처리 성능 비교 (3회 반복)
-python3.14t port_monitor_freethreading.py --benchmark
+python3 port_monitor_freethreading.py --benchmark
 ```
 
 출력 예시:
@@ -83,16 +83,16 @@ python3.14t port_monitor_freethreading.py --benchmark
 
 ```bash
 # 병렬 처리 강제 사용 (테스트용)
-python3.14t port_monitor_freethreading.py --parallel
+python3 port_monitor_freethreading.py --parallel
 
 # 순차 처리 강제 사용 (비교용)
-python3.14t port_monitor_freethreading.py --sequential
+python3 port_monitor_freethreading.py --sequential
 ```
 
 ### 4. 포트 범위 지정
 
 ```bash
-python3.14t port_monitor_freethreading.py --start-port 5000 --end-port 8000
+python3 port_monitor_freethreading.py --start-port 5000 --end-port 8000
 ```
 
 ## 코드 구조
@@ -183,7 +183,7 @@ python -c "import sysconfig; print('GIL Disabled:', sysconfig.get_config_var('Py
 sudo apt update
 sudo apt install software-properties-common
 sudo add-apt-repository ppa:deadsnakes/ppa
-sudo apt install python3.14t
+sudo apt install python3
 
 # 또는 소스에서 빌드
 wget https://www.python.org/ftp/python/3.14.0/Python-3.14.0.tar.xz
@@ -217,10 +217,10 @@ python -c "import sysconfig; print('GIL:', sysconfig.get_config_var('Py_GIL_DISA
 ### psutil 권한 오류
 ```bash
 # sudo로 실행
-sudo python3.14t port_monitor_freethreading.py
+sudo python3 port_monitor_freethreading.py
 
 # 또는 CAP_NET_RAW 권한 부여
-sudo setcap cap_net_raw+ep $(which python3.14t)
+sudo setcap cap_net_raw+ep $(which python3)
 ```
 
 ## 참고 자료

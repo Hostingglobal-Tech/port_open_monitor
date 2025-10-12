@@ -87,7 +87,7 @@ Python 3.14의 free-threading (GIL 비활성화) 기능을 활용한 고성능 �
 
 **간편 명령어 (bashrc alias):**
 ```bash
-# ~/.bashrc에 설정된 alias 사용
+# ~/.bashrc에 설정된 alias 사용 (python3 = 3.14t)
 pmft          # Free-threading 포트 모니터 실행
 pmft-bench    # 성능 벤치마크 (순차 vs 병렬 비교)
 ```
@@ -95,16 +95,16 @@ pmft-bench    # 성능 벤치마크 (순차 vs 병렬 비교)
 **직접 실행:**
 ```bash
 # 기본 실행 (자동으로 최적 방식 선택)
-python3.14t port_monitor_freethreading.py
+python3 port_monitor_freethreading.py
 
 # 성능 벤치마크 (순차 vs 병렬 비교)
-python3.14t port_monitor_freethreading.py --benchmark
+python3 port_monitor_freethreading.py --benchmark
 
 # 병렬 처리 강제 사용
-python3.14t port_monitor_freethreading.py --parallel
+python3 port_monitor_freethreading.py --parallel
 
 # 순차 처리 강제 사용 (비교용)
-python3.14t port_monitor_freethreading.py --sequential
+python3 port_monitor_freethreading.py --sequential
 
 # 테스트 스크립트 실행
 ./test_freethreading.sh
@@ -126,8 +126,9 @@ cd ~/DEVEL/port_open_monitor  # 또는 프로젝트 디렉토리
 pyenv local 3.14.0t
 
 # ~/.bashrc에 alias 추가 (이미 설정됨)
-alias pmft="python3.14t /path/to/port_monitor_freethreading.py"
-alias pmft-bench="python3.14t /path/to/port_monitor_freethreading.py --benchmark"
+# python3가 이미 3.14t로 설정되어 있음
+alias pmft="python3 /path/to/port_monitor_freethreading.py"
+alias pmft-bench="python3 /path/to/port_monitor_freethreading.py --benchmark"
 
 # bashrc 리로드
 source ~/.bashrc
