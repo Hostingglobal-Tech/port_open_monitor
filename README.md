@@ -8,6 +8,7 @@
 - **즉시 프로세스 종료**: 화면에서 번호 선택으로 바로 kill 가능
 - **상세 정보 제공**: PID, 메모리 사용량, 사용자, 전체 경로 표시
 - **대화형 모드**: 메뉴 기반 인터페이스로 편리한 관리
+- **🆕 Python 3.14 Free-Threading 지원**: GIL 없이 진정한 병렬 처리!
 
 ## 📊 현재 포트 사용 예시
 
@@ -80,14 +81,57 @@ python3 port_monitor.py -p 4001
 python3 port_monitor.py -k 35403
 ```
 
+### 🆕 Python 3.14 Free-Threading 버전
+
+Python 3.14의 free-threading (GIL 비활성화) 기능을 활용한 고성능 버전입니다.
+
+```bash
+# 기본 실행 (자동으로 최적 방식 선택)
+python3.14t port_monitor_freethreading.py
+
+# 성능 벤치마크 (순차 vs 병렬 비교)
+python3.14t port_monitor_freethreading.py --benchmark
+
+# 병렬 처리 강제 사용
+python3.14t port_monitor_freethreading.py --parallel
+
+# 순차 처리 강제 사용 (비교용)
+python3.14t port_monitor_freethreading.py --sequential
+
+# 테스트 스크립트 실행
+./test_freethreading.sh
+```
+
+**주요 특징:**
+- ✅ GIL 자동 감지 및 최적화
+- ⚡ ThreadPoolExecutor로 프로세스 정보 병렬 수집
+- 📊 실시간 성능 벤치마크 기능
+- 🎯 CPU 코어 수에 따른 자동 워커 조정
+
+**설치 방법:**
+```bash
+# Python 3.14 free-threading 빌드 설치
+pyenv install 3.14.0t
+
+# 프로젝트에 적용
+cd ~/DEVEL/port_open_monitor  # 또는 프로젝트 디렉토리
+pyenv local 3.14.0t
+```
+
+**상세 가이드:** [FREETHREADING_GUIDE.md](./FREETHREADING_GUIDE.md)
+
 ## 📁 파일 구조
 
 ```
 port_open_monitor/
-├── pm                        # 간편 실행 스크립트
-├── port_monitor.py          # 기본 모니터링 스크립트
-├── port_monitor_enhanced.py # 향상된 버전 (폴더명 표시)
-└── README.md               # 이 파일
+├── pm                              # 간편 실행 스크립트
+├── port_monitor.py                 # 기본 모니터링 스크립트
+├── port_monitor_enhanced.py        # 향상된 버전 (폴더명 표시)
+├── port_monitor_interactive.py     # 대화형 자동 갱신 버전
+├── port_monitor_freethreading.py   # 🆕 Python 3.14 Free-Threading 버전
+├── FREETHREADING_GUIDE.md          # Free-Threading 상세 가이드
+├── test_freethreading.sh           # Free-Threading 테스트 스크립트
+└── README.md                       # 이 파일
 ```
 
 ## 🔍 모드별 기능

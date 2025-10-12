@@ -28,3 +28,12 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Sensitive information
+*.secret
+credentials.json
+.env
+.env.local
+
+# Serena MCP
+.serena/
