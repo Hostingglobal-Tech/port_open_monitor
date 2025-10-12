@@ -121,7 +121,7 @@ class EnhancedPortMonitor:
         if cwd == 'Unknown' or not cwd:
             return 'Unknown'
         
-        # /home/nmsglobal/DEVEL/ 다음의 폴더명 추출
+        # DEVEL 디렉토리 다음의 폴더명 추출
         if '/DEVEL/' in cwd:
             parts = cwd.split('/DEVEL/')
             if len(parts) > 1:

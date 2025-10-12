@@ -29,7 +29,8 @@ class PortMonitor:
     def detect_project_mappings(self) -> Dict[int, str]:
         """포트와 프로젝트 매핑 자동 감지"""
         mappings = {}
-        devel_path = Path("/home/nmsglobal/DEVEL")
+        # 사용자 환경에 맞게 경로 수정 필요
+        devel_path = Path(os.path.expanduser("~/DEVEL"))
         
         # 알려진 프로젝트 포트 매핑
         known_mappings = {

@@ -1,5 +1,6 @@
 {
-  "name": "port-open-monitor",
+  "name": "@private/port-open-monitor",
+  "private": true,
   "version": "1.0.0",
   "description": "🚀 Port monitoring tool for development environments. Monitor TCP ports 3000-9000 with project folder detection and interactive process management.",
   "main": "index.js",

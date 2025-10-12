@@ -3,8 +3,9 @@
 # Port Open Monitor - Temporary Files Cleanup Script
 # This script moves temporary and test files to the organized TEMP directory
 
-PROJECT_DIR="/home/nmsglobal/DEVEL/port_open_monitor"
-TEMP_DIR="/home/nmsglobal/DEVEL/TEMP/port_open_monitor"
+# 사용자 환경에 맞게 경로 수정 필요
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TEMP_DIR="$HOME/TEMP/port_open_monitor"
 
 echo "=== Port Open Monitor Cleanup Script ==="
 echo "Project Directory: $PROJECT_DIR"

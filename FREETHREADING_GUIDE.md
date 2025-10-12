@@ -167,8 +167,8 @@ cd ~/.pyenv && git pull
 # Python 3.14t 설치 (t = free-threading)
 pyenv install 3.14.0t
 
-# 프로젝트별로 설정
-cd /home/nmsglobal/DEVEL/port_open_monitor
+# 프로젝트 디렉토리로 이동
+cd /path/to/port_open_monitor
 pyenv local 3.14.0t
 
 # 확인

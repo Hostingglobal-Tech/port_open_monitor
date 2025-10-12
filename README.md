@@ -10,15 +10,15 @@
 - **대화형 모드**: 메뉴 기반 인터페이스로 편리한 관리
 - **🆕 Python 3.14 Free-Threading 지원**: GIL 없이 진정한 병렬 처리!
 
-## 📊 현재 포트 사용 예시
+## 📊 화면 예시
 
 ```
 ┏━━━┳━━━━━━┳━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━┓
 ┃ No┃ Port ┃ PID  ┃ Process         ┃ Project Folder             ┃ Memory┃ User     ┃
 ┡━━━╇━━━━━━╇━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━┩
-│ 1 │ 4001 │ 35403│ next-server     │ compose_email_system       │ 338MB │ nmsglobal│
-│ 2 │ 4300 │ 14367│ node            │ customer_management_system │ 1.7GB │ nmsglobal│
-│ 3 │ 8000 │ 87897│ node            │ compose_email_system       │ 148MB │ nmsglobal│
+│ 1 │ 30XX │ XXXXX│ next-server     │ my_project                 │ 338MB │ user1    │
+│ 2 │ 43XX │ XXXXX│ node            │ another_project            │ 1.7GB │ user1    │
+│ 3 │ 80XX │ XXXXX│ node            │ my_project                 │ 148MB │ user1    │
 └───┴──────┴──────┴─────────────────┴────────────────────────────┴───────┴──────────┘
 ```
 
@@ -40,7 +40,7 @@
 ./pm m 30
 
 # 특정 포트 프로세스 종료
-./pm kill 4001
+./pm kill <PORT>
 
 # 도움말
 ./pm help
@@ -75,10 +75,10 @@ python3 port_monitor.py
 python3 port_monitor.py -i
 
 # 특정 포트 프로세스 종료
-python3 port_monitor.py -p 4001
+python3 port_monitor.py -p <PORT>
 
 # PID로 프로세스 종료
-python3 port_monitor.py -k 35403
+python3 port_monitor.py -k <PID>
 ```
 
 ### 🆕 Python 3.14 Free-Threading 버전
@@ -184,7 +184,7 @@ port_open_monitor/
 
 ## 💡 특징
 
-- **프로젝트 자동 감지**: /home/nmsglobal/DEVEL/ 하위 폴더명 자동 추출
+- **프로젝트 자동 감지**: DEVEL 디렉토리 하위 폴더명 자동 추출
 - **색상 하이라이트**: 프로젝트별 색상으로 구분
 - **메모리 모니터링**: 각 프로세스의 메모리 사용량 실시간 표시
 - **권한 자동 처리**: sudo 권한 필요시 자동 처리
@@ -200,10 +200,9 @@ port_open_monitor/
 - **SIGTERM (15)**: 정상 종료 요청 (기본)
 - **SIGKILL (9)**: 강제 종료 (Force kill)
 
-## 📊 알려진 프로젝트 매핑
+## 📊 사용 팁
 
-- Port 4001: newsletter_email_system
-- Port 4300: system-scan-report-remix
-- Port 4400: customer_management_system (frontend)
-- Port 8000: compose_email_system (backend)
-- Port 8888: Jupyter Lab
+- **프로세스 숨기기**: 불필요한 프로세스를 화면에서 숨길 수 있습니다
+- **즉시 갱신**: 'r' 키로 카운트다운 없이 즉시 갱신
+- **빠른 종료**: 숫자 입력으로 프로세스 즉시 종료
+- **자동 갱신**: 기본 60초, -t 옵션으로 조정 가능
