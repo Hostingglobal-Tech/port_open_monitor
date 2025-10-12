@@ -261,18 +261,10 @@ class FreeThreadingPortMonitor:
         return Path(cwd).name if cwd else 'Unknown'
 
     def display_ports_with_actions(self, ports_info: List[Dict], elapsed_time: float):
-        """포트 정보를 테이블로 표시 (성능 정보 포함)"""
+        """포트 정보를 테이블로 표시"""
         # 헤더 정보
-        header_text = f"🚀 Free-Threading Port Monitor ({self.port_range[0]}-{self.port_range[1]})"
-        if self.gil_disabled:
-            header_text += " [진정한 병렬 처리!]"
-
+        header_text = f"🚀 Port Monitor ({self.port_range[0]}-{self.port_range[1]})"
         console.print(Panel(header_text, style="bold cyan"))
-
-        # Python 정보
-        console.print(self.display_python_info())
-        console.print(f"\n[bold]포트 정보 수집 시간:[/bold] {elapsed_time:.3f}초")
-        console.print("")
 
         # 테이블
         table = Table(show_header=True, header_style="bold magenta")
@@ -390,39 +382,64 @@ class FreeThreadingPortMonitor:
 
     def quick_view(self):
         """빠른 보기 모드"""
-        ports_info, elapsed = self.get_open_ports()
+        hidden_pids = set()
 
-        if not ports_info:
-            console.print(f"[yellow]No ports found in range {self.port_range[0]}-{self.port_range[1]}[/yellow]")
-            return
+        while True:
+            ports_info, elapsed = self.get_open_ports()
 
-        self.display_ports_with_actions(ports_info, elapsed)
+            if not ports_info:
+                console.print(f"[yellow]No ports found in range {self.port_range[0]}-{self.port_range[1]}[/yellow]")
+                return
 
-        if not sys.stdin.isatty():
-            return
+            # 숨긴 프로세스 제외
+            visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
 
-        # 메뉴
-        console.print("\n[bold cyan]옵션:[/bold cyan]")
-        console.print("1. 성능 벤치마크 실행")
-        console.print("2. 프로세스 종료")
-        console.print("3. 종료")
+            if not visible_ports:
+                console.print("[yellow]모든 프로세스가 숨겨졌습니다.[/yellow]")
+                if Confirm.ask("숨김 목록을 초기화하시겠습니까?"):
+                    hidden_pids.clear()
+                    continue
+                return
 
-        choice = Prompt.ask("[bold yellow]선택[/bold yellow]", choices=["1", "2", "3"], default="3")
+            self.display_ports_with_actions(visible_ports, elapsed)
 
-        if choice == "1":
-            self.benchmark_comparison()
-        elif choice == "2":
-            idx = Prompt.ask("종료할 프로세스 번호")
-            try:
-                idx = int(idx) - 1
-                if 0 <= idx < len(ports_info):
-                    sorted_ports = sorted(ports_info, key=lambda x: x['port'])
-                    selected = sorted_ports[idx]
-                    if selected['pid']:
-                        if Confirm.ask(f"[{selected['project_folder']}] 프로세스 종료 (PID: {selected['pid']})?"):
-                            self.kill_process(selected['pid'])
-            except ValueError:
-                console.print("[red]잘못된 입력[/red]")
+            if not sys.stdin.isatty():
+                return
+
+            # 메뉴
+            console.print("\n[bold cyan]옵션:[/bold cyan]")
+            console.print("1. 프로세스 숨기기")
+            console.print("2. 프로세스 종료")
+            console.print("3. 프로그램 종료")
+
+            choice = Prompt.ask("[bold yellow]선택[/bold yellow]", choices=["1", "2", "3"], default="3")
+
+            if choice == "1":
+                idx = Prompt.ask("숨길 프로세스 번호")
+                try:
+                    idx = int(idx) - 1
+                    if 0 <= idx < len(visible_ports):
+                        sorted_ports = sorted(visible_ports, key=lambda x: x['port'])
+                        selected = sorted_ports[idx]
+                        if selected['pid']:
+                            hidden_pids.add(selected['pid'])
+                            console.print(f"[green]✓ PID {selected['pid']} ({selected['project_folder']}) 숨김 처리됨[/green]")
+                except ValueError:
+                    console.print("[red]잘못된 입력[/red]")
+            elif choice == "2":
+                idx = Prompt.ask("종료할 프로세스 번호")
+                try:
+                    idx = int(idx) - 1
+                    if 0 <= idx < len(visible_ports):
+                        sorted_ports = sorted(visible_ports, key=lambda x: x['port'])
+                        selected = sorted_ports[idx]
+                        if selected['pid']:
+                            if Confirm.ask(f"[{selected['project_folder']}] 프로세스 종료 (PID: {selected['pid']})?"):
+                                self.kill_process(selected['pid'])
+                except ValueError:
+                    console.print("[red]잘못된 입력[/red]")
+            elif choice == "3":
+                break
 
 
 def main():
