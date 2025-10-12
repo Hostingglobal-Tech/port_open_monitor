@@ -85,6 +85,14 @@ python3 port_monitor.py -k 35403
 
 Python 3.14의 free-threading (GIL 비활성화) 기능을 활용한 고성능 버전입니다.
 
+**간편 명령어 (bashrc alias):**
+```bash
+# ~/.bashrc에 설정된 alias 사용
+pmft          # Free-threading 포트 모니터 실행
+pmft-bench    # 성능 벤치마크 (순차 vs 병렬 비교)
+```
+
+**직접 실행:**
 ```bash
 # 기본 실행 (자동으로 최적 방식 선택)
 python3.14t port_monitor_freethreading.py
@@ -116,6 +124,13 @@ pyenv install 3.14.0t
 # 프로젝트에 적용
 cd ~/DEVEL/port_open_monitor  # 또는 프로젝트 디렉토리
 pyenv local 3.14.0t
+
+# ~/.bashrc에 alias 추가 (이미 설정됨)
+alias pmft="python3.14t /path/to/port_monitor_freethreading.py"
+alias pmft-bench="python3.14t /path/to/port_monitor_freethreading.py --benchmark"
+
+# bashrc 리로드
+source ~/.bashrc
 ```
 
 **상세 가이드:** [FREETHREADING_GUIDE.md](./FREETHREADING_GUIDE.md)
