@@ -27,7 +27,7 @@ import threading
 console = Console()
 
 class InteractivePortMonitor:
-    def __init__(self, start_port=3000, end_port=9000):
+    def __init__(self, start_port=443, end_port=9000):
         self.port_range = (start_port, end_port)
         # sudo 비밀번호는 환경변수 SUDO_PASSWORD에서 가져오기
         self.sudo_password = os.getenv('SUDO_PASSWORD', '')
@@ -417,7 +417,7 @@ def main():
     
     parser = argparse.ArgumentParser(description="Interactive Port Monitor with Kill Feature")
     parser.add_argument('-t', '--interval', type=int, default=60, help='Refresh interval in seconds (default: 60)')
-    parser.add_argument('--start-port', type=int, default=3000, help='Start of port range to monitor (default: 3000)')
+    parser.add_argument('--start-port', type=int, default=443, help='Start of port range to monitor (default: 443 - HTTPS)')
     parser.add_argument('--end-port', type=int, default=9000, help='End of port range to monitor (default: 9000)')
     
     args = parser.parse_args()

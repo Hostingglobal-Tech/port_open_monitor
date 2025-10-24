@@ -27,7 +27,7 @@ from rich import print as rprint
 console = Console()
 
 class FreeThreadingPortMonitor:
-    def __init__(self, start_port=3000, end_port=9000):
+    def __init__(self, start_port=443, end_port=9000):
         self.port_range = (start_port, end_port)
         # sudo 비밀번호는 환경변수 SUDO_PASSWORD에서 가져오거나 직접 입력
         self.sudo_password = os.getenv('SUDO_PASSWORD', '')
@@ -604,7 +604,7 @@ def main():
     parser.add_argument('-t', '--interval', type=int, default=60, help='자동 갱신 주기(초) (기본: 60)')
     parser.add_argument('--parallel', action='store_true', help='병렬 처리 강제 사용')
     parser.add_argument('--sequential', action='store_true', help='순차 처리 강제 사용')
-    parser.add_argument('--start-port', type=int, default=3000, help='시작 포트 (기본: 3000)')
+    parser.add_argument('--start-port', type=int, default=443, help='시작 포트 (기본: 443 - HTTPS)')
     parser.add_argument('--end-port', type=int, default=9000, help='종료 포트 (기본: 9000)')
 
     args = parser.parse_args()

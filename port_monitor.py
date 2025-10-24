@@ -20,7 +20,7 @@ from rich import print as rprint
 console = Console()
 
 class PortMonitor:
-    def __init__(self, start_port=3000, end_port=9000):
+    def __init__(self, start_port=443, end_port=9000):
         self.port_range = (start_port, end_port)
         # sudo 비밀번호는 환경변수 SUDO_PASSWORD에서 가져오기
         self.sudo_password = os.getenv('SUDO_PASSWORD', '')
