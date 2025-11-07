@@ -476,7 +476,7 @@ class FreeThreadingPortMonitor:
                 # 카운트다운 표시 (매 초마다 업데이트)
                 if countdown > 0:
                     sys.stdout.write('\r\033[K')
-                    sys.stdout.write(f"[Auto refresh in {countdown}s] Commands: [0-9]=kill process | h=hide | r=refresh | q=quit")
+                    sys.stdout.write(f"[Auto refresh in {countdown}s] Commands: [No.]=kill (e.g. 1, 10, 15) | h=hide | r=refresh | q=quit")
                     sys.stdout.flush()
                     countdown -= 1
 
