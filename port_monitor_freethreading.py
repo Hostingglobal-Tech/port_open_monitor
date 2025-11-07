@@ -273,7 +273,8 @@ class FreeThreadingPortMonitor:
 
         # 타임스탬프
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        console.print(f"[dim]Last updated: {timestamp}[/dim]\n")
+        console.print(f"[dim]Last updated: {timestamp}[/dim]")
+        console.print(f"[dim]Usage: Type process No. (e.g., 1, 10, 15) and press Enter to kill[/dim]\n")
 
         # 테이블
         table = Table(show_header=True, header_style="bold magenta")
@@ -397,8 +398,8 @@ class FreeThreadingPortMonitor:
             return sys.stdin.read(1)
         return None
 
-    def get_multi_char_input(self, prompt_text: str, timeout: int = 10) -> str:
-        """멀티 문자 입력을 받는 함수"""
+    def get_multi_char_input(self, prompt_text: str, timeout: int = 30) -> str:
+        """멀티 문자 입력을 받는 함수 (개선됨)"""
         sys.stdout.write('\r\033[K')
         sys.stdout.write(prompt_text)
         sys.stdout.flush()
@@ -422,6 +423,8 @@ class FreeThreadingPortMonitor:
                     input_text = input_text[:-1]
                     sys.stdout.write('\b \b')
                     sys.stdout.flush()
+            elif char == '\x1b':  # ESC key
+                return ''  # 빈 문자열 반환으로 취소
             elif char and char.isalpha():
                 # 알파벳이 입력되면 즉시 종료 (q, r, h 등의 명령어)
                 return char
@@ -473,7 +476,7 @@ class FreeThreadingPortMonitor:
                 # 카운트다운 표시 (매 초마다 업데이트)
                 if countdown > 0:
                     sys.stdout.write('\r\033[K')
-                    sys.stdout.write(f"[Auto refresh in {countdown}s] Enter number to kill, h:hide, r:refresh, q:quit")
+                    sys.stdout.write(f"[Auto refresh in {countdown}s] Commands: [0-9]=kill process | h=hide | r=refresh | q=quit")
                     sys.stdout.flush()
                     countdown -= 1
 
@@ -496,12 +499,12 @@ class FreeThreadingPortMonitor:
                         last_update = time.time()
                         countdown = interval
                     elif user_input.lower() == 'h':
-                        # Hide 모드
+                        # Hide 모드 (개선됨)
                         sys.stdout.write('\r\033[K')
                         sys.stdout.flush()
 
                         if is_terminal:
-                            hide_input = self.get_multi_char_input("Enter process number to hide: ")
+                            hide_input = self.get_multi_char_input("Hide process No. (type number and press Enter, ESC to cancel): ")
                             if hide_input and hide_input.isdigit():
                                 hide_idx = int(hide_input) - 1
                                 if 0 <= hide_idx < len(visible_ports):
@@ -509,8 +512,19 @@ class FreeThreadingPortMonitor:
                                     pid_to_hide = sorted_ports[hide_idx]['pid']
                                     if pid_to_hide:
                                         hidden_pids.add(pid_to_hide)
-                                        console.print(f"\n[yellow]Hidden PID {pid_to_hide}[/yellow]")
+                                        port_num = sorted_ports[hide_idx]['port']
+                                        proj = sorted_ports[hide_idx]['project_folder']
+                                        console.print(f"\n[yellow]✓ Hidden: No.{hide_idx+1} - {proj} (Port {port_num}, PID {pid_to_hide})[/yellow]")
                                         time.sleep(1)
+                                    else:
+                                        console.print(f"\n[red]No PID found[/red]")
+                                        time.sleep(1)
+                                else:
+                                    console.print(f"\n[red]Invalid selection: {hide_input} (valid range: 1-{len(visible_ports)})[/red]")
+                                    time.sleep(1)
+                            elif hide_input == '':
+                                # ESC 눌렀을 경우 - 아무것도 안 함
+                                pass
 
                         # 갱신
                         ports_info, _ = self.get_open_ports()
@@ -518,32 +532,43 @@ class FreeThreadingPortMonitor:
                         self.display_ports_with_actions(visible_ports)
                         countdown = interval
                     elif user_input.isdigit():
-                        # Kill 모드 - 숫자로 시작하면 전체 번호 입력받기
+                        # Kill 모드 - 번호 입력받기 (개선됨)
                         sys.stdout.write('\r\033[K')
 
                         if is_terminal:
-                            remaining_input = self.get_multi_char_input(f"Enter process number to kill (started with {user_input}): ")
+                            # 첫 번째 숫자 포함해서 전체 번호 입력받기
+                            full_input = self.get_multi_char_input(f"Kill process No. (type number and press Enter, ESC to cancel): {user_input}")
 
                             # 알파벳이 입력된 경우 (명령어) 처리
-                            if remaining_input and remaining_input.isalpha():
-                                if remaining_input.lower() == 'q':
+                            if full_input and full_input.isalpha():
+                                if full_input.lower() == 'q':
                                     console.print("\n[yellow]Exiting...[/yellow]")
                                     break
-                                elif remaining_input.lower() == 'r':
+                                elif full_input.lower() == 'r':
                                     ports_info, _ = self.get_open_ports()
                                     visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
                                     self.display_ports_with_actions(visible_ports)
                                     last_update = time.time()
                                     countdown = interval
                                     continue
+                                else:
+                                    # 다른 알파벳은 무시하고 화면 갱신
+                                    ports_info, _ = self.get_open_ports()
+                                    visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
+                                    self.display_ports_with_actions(visible_ports)
+                                    countdown = interval
+                                    continue
+
+                            # ESC 눌렀을 경우
+                            if full_input == '':
+                                ports_info, _ = self.get_open_ports()
+                                visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
+                                self.display_ports_with_actions(visible_ports)
+                                countdown = interval
+                                continue
 
                             # 숫자 조합 생성
-                            if remaining_input and remaining_input.isdigit():
-                                kill_input = user_input + remaining_input
-                            elif not remaining_input:  # 엔터만 눌렀을 경우
-                                kill_input = user_input
-                            else:
-                                kill_input = user_input
+                            kill_input = user_input + full_input
                         else:
                             kill_input = user_input
 
@@ -555,8 +580,9 @@ class FreeThreadingPortMonitor:
 
                                 if selected['pid']:
                                     console.print(f"\n\n[yellow]Killing {selected['project_folder']} on port {selected['port']} (PID: {selected['pid']})...[/yellow]")
-                                    self.kill_process(selected['pid'])
-                                    time.sleep(2)
+                                    if self.kill_process(selected['pid']):
+                                        console.print(f"[green]✓ Successfully killed process {selected['pid']}[/green]")
+                                    time.sleep(1)
 
                                     # 갱신
                                     ports_info, _ = self.get_open_ports()
@@ -564,8 +590,15 @@ class FreeThreadingPortMonitor:
                                     self.display_ports_with_actions(visible_ports)
                                     last_update = time.time()
                                     countdown = interval
+                                else:
+                                    console.print(f"\n[red]No PID found for port {selected['port']}[/red]")
+                                    time.sleep(1)
+                                    ports_info, _ = self.get_open_ports()
+                                    visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
+                                    self.display_ports_with_actions(visible_ports)
+                                    countdown = interval
                             else:
-                                console.print(f"\n[red]Invalid selection: {kill_input}[/red]")
+                                console.print(f"\n[red]Invalid selection: {kill_input} (valid range: 1-{len(visible_ports)})[/red]")
                                 time.sleep(1)
                                 ports_info, _ = self.get_open_ports()
                                 visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
