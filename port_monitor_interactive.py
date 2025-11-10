@@ -212,7 +212,7 @@ class InteractivePortMonitor:
 
     
     def get_multi_char_input(self, prompt_text: str, timeout: int = 10) -> str:
-        """멀티 문자 입력을 받는 함수"""
+        """멀티 문자 입력을 받는 함수 (ESC는 None 반환)"""
         sys.stdout.write('\r\033[K')
         sys.stdout.write(prompt_text)
         sys.stdout.flush()
@@ -236,6 +236,8 @@ class InteractivePortMonitor:
                     input_text = input_text[:-1]
                     sys.stdout.write('\b \b')
                     sys.stdout.flush()
+            elif char == '\x1b':  # ESC key
+                return None  # None 반환으로 취소 (빈 문자열과 구분)
             elif char and char.isalpha():
                 # 알파벳이 입력되면 즉시 종료 (q, r, h, u, s 등의 명령어)
                 return char
@@ -346,11 +348,16 @@ class InteractivePortMonitor:
                         
                         if is_terminal:
                             # 첫 번째 숫자와 함께 나머지 숫자들을 입력받기
-                            remaining_input = self.get_multi_char_input(f"Enter process number to kill (started with {user_input}): ")
-                            
+                            remaining_input = self.get_multi_char_input(f"Kill process No. (press Enter to confirm, ESC to cancel): {user_input}")
+
+                            # ESC 취소 처리 (None 반환)
+                            if remaining_input is None:
+                                self.display_ports_with_actions(self.ports_info)
+                                countdown = interval
+                                continue
+
                             # 알파벳이 입력된 경우 (명령어) 처리
                             if remaining_input and remaining_input.isalpha():
-                                # 알파벳 명령어로 다시 처리
                                 if remaining_input.lower() == 'q':
                                     console.print("\n[yellow]Exiting...[/yellow]")
                                     break
@@ -360,15 +367,12 @@ class InteractivePortMonitor:
                                     last_update = time.time()
                                     countdown = interval
                                     continue
-                                # 다른 명령어들도 여기서 처리 가능
-                            
+
                             # 숫자 조합 생성
                             if remaining_input and remaining_input.isdigit():
                                 kill_input = user_input + remaining_input
-                            elif not remaining_input:  # 엔터만 눌렀을 경우
-                                kill_input = user_input
                             else:
-                                kill_input = user_input  # 잘못된 입력은 첫 번째 숫자만 사용
+                                kill_input = user_input  # 한자리수 입력 + Enter 경우
                         else:
                             kill_input = user_input
                         

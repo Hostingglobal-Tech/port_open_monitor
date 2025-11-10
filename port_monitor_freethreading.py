@@ -399,7 +399,7 @@ class FreeThreadingPortMonitor:
         return None
 
     def get_multi_char_input(self, prompt_text: str, timeout: int = 30) -> str:
-        """멀티 문자 입력을 받는 함수 (개선됨)"""
+        """멀티 문자 입력을 받는 함수 (개선됨 - ESC는 None 반환)"""
         sys.stdout.write('\r\033[K')
         sys.stdout.write(prompt_text)
         sys.stdout.flush()
@@ -424,7 +424,7 @@ class FreeThreadingPortMonitor:
                     sys.stdout.write('\b \b')
                     sys.stdout.flush()
             elif char == '\x1b':  # ESC key
-                return ''  # 빈 문자열 반환으로 취소
+                return None  # None 반환으로 취소 (빈 문자열과 구분)
             elif char and char.isalpha():
                 # 알파벳이 입력되면 즉시 종료 (q, r, h 등의 명령어)
                 return char
@@ -537,8 +537,8 @@ class FreeThreadingPortMonitor:
                             # 첫 숫자 표시하고 나머지 즉시 입력받기
                             full_input = self.get_multi_char_input(f"Kill process No. (press Enter to confirm, ESC to cancel): {user_input}")
 
-                            # 취소 처리
-                            if full_input == '':
+                            # ESC 취소 처리 (None 반환)
+                            if full_input is None:
                                 ports_info, _ = self.get_open_ports()
                                 visible_ports = [p for p in ports_info if p['pid'] not in hidden_pids]
                                 self.display_ports_with_actions(visible_ports)
@@ -558,8 +558,11 @@ class FreeThreadingPortMonitor:
                                     countdown = interval
                                     continue
 
-                            # 숫자 조합
-                            kill_input = user_input + full_input
+                            # 숫자 조합 (full_input이 빈 문자열이면 user_input만 사용)
+                            if full_input and full_input.isdigit():
+                                kill_input = user_input + full_input
+                            else:
+                                kill_input = user_input  # 한자리수 입력 + Enter 경우
                         else:
                             kill_input = user_input
 
