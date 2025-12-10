@@ -180,9 +180,6 @@ class InteractivePortMonitor:
         console.print(table)
         console.print(f"\n[bold]Total ports:[/bold] {len(visible_ports)} visible, {len(self.hidden_ports)} hidden")
         console.print("")  # 카운트다운과 구분을 위한 빈 줄
-        # 커서 위치 저장 (카운트다운 메시지가 여기에 표시됨)
-        sys.stdout.write('\033[s')  # 커서 위치 저장
-        sys.stdout.flush()
 
         return visible_ports
     
@@ -278,11 +275,17 @@ class InteractivePortMonitor:
                     last_update = current_time
                     countdown = interval
                 
-                # 카운트다운 표시 (저장된 커서 위치로 이동하여 업데이트)
+                # 카운트다운 표시 (화면 하단 고정 위치에 표시)
                 if countdown > 0:
-                    sys.stdout.write('\033[u')  # 저장된 커서 위치로 복원
-                    sys.stdout.write('\033[K')  # 현재 줄 지우기
-                    sys.stdout.write(f"[Auto refresh in {countdown}s] Enter number to kill, h:hide, u:unhide, s:show, r:refresh, q:quit")
+                    # 터미널 크기 가져오기
+                    try:
+                        term_height = os.get_terminal_size().lines
+                    except:
+                        term_height = 24  # 기본값
+                    # 커서를 화면 맨 아래줄로 이동하고 줄 지우기
+                    sys.stdout.write(f'\033[{term_height};1H')  # 마지막 줄로 이동
+                    sys.stdout.write('\033[K')  # 줄 지우기
+                    sys.stdout.write(f"[{countdown}s] No.=kill | h=hide | u=unhide | r=refresh | q=quit")
                     sys.stdout.flush()
                     countdown -= 1
                 
