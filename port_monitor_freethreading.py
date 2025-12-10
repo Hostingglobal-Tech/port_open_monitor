@@ -307,6 +307,9 @@ class FreeThreadingPortMonitor:
         console.print(table)
         console.print(f"\n[bold]Total ports in use:[/bold] {len(ports_info)}")
         console.print("")  # 카운트다운과 구분용 빈 줄
+        # 커서 위치 저장 (카운트다운 메시지가 여기에 표시됨)
+        sys.stdout.write('\033[s')  # 커서 위치 저장
+        sys.stdout.flush()
 
         return ports_info
 
@@ -475,9 +478,10 @@ class FreeThreadingPortMonitor:
                     last_update = current_time
                     countdown = interval
 
-                # 카운트다운 표시 (매 초마다 업데이트)
+                # 카운트다운 표시 (저장된 커서 위치로 이동하여 업데이트)
                 if countdown > 0:
-                    sys.stdout.write('\r\033[K')
+                    sys.stdout.write('\033[u')  # 저장된 커서 위치로 복원
+                    sys.stdout.write('\033[K')  # 현재 줄 지우기
                     sys.stdout.write(f"[Auto refresh in {countdown}s] Commands: [No.]=kill (e.g. 1, 10, 15) | h=hide | r=refresh | q=quit")
                     sys.stdout.flush()
                     countdown -= 1

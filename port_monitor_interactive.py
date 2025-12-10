@@ -180,7 +180,10 @@ class InteractivePortMonitor:
         console.print(table)
         console.print(f"\n[bold]Total ports:[/bold] {len(visible_ports)} visible, {len(self.hidden_ports)} hidden")
         console.print("")  # 카운트다운과 구분을 위한 빈 줄
-        
+        # 커서 위치 저장 (카운트다운 메시지가 여기에 표시됨)
+        sys.stdout.write('\033[s')  # 커서 위치 저장
+        sys.stdout.flush()
+
         return visible_ports
     
     def kill_process(self, pid: int, force: bool = False) -> bool:
@@ -275,10 +278,10 @@ class InteractivePortMonitor:
                     last_update = current_time
                     countdown = interval
                 
-                # 카운트다운 표시 (같은 줄에서 업데이트)
+                # 카운트다운 표시 (저장된 커서 위치로 이동하여 업데이트)
                 if countdown > 0:
-                    # 커서를 줄 처음으로 이동하고 줄 전체 지우기
-                    sys.stdout.write('\r\033[K')
+                    sys.stdout.write('\033[u')  # 저장된 커서 위치로 복원
+                    sys.stdout.write('\033[K')  # 현재 줄 지우기
                     sys.stdout.write(f"[Auto refresh in {countdown}s] Enter number to kill, h:hide, u:unhide, s:show, r:refresh, q:quit")
                     sys.stdout.flush()
                     countdown -= 1
