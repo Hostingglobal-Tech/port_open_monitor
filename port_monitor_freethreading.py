@@ -292,10 +292,11 @@ class FreeThreadingPortMonitor:
         table = Table(show_header=True, header_style="bold magenta")
 
         if is_mobile:
-            # 모바일 모드: No., Port, Project만 표시
+            # 모바일 모드: No., Port, Project, Memory 표시
             table.add_column("No.", style="bold white", width=3)
             table.add_column("Port", style="cyan", width=5)
             table.add_column("Project", style="bold green")
+            table.add_column("Mem", style="red", width=6)
         else:
             # PC 모드: 전체 정보 표시
             table.add_column("No.", style="bold white", width=5)
@@ -316,7 +317,8 @@ class FreeThreadingPortMonitor:
                 table.add_row(
                     str(idx),
                     str(port['port']),
-                    folder_display
+                    folder_display,
+                    str(port['memory'])
                 )
             else:
                 table.add_row(
