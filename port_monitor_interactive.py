@@ -132,7 +132,9 @@ class InteractivePortMonitor:
     
     def display_ports_with_actions(self, ports_info: List[Dict]):
         """포트 정보를 테이블로 표시"""
-        console.clear()
+        # ANSI escape: 화면 지우고 커서를 맨 위로 이동 (tmux 호환)
+        sys.stdout.write('\033[2J\033[H')
+        sys.stdout.flush()
         
         # 헤더
         console.print(Panel(f"🔄 Port Monitor ({self.port_range[0]}-{self.port_range[1]})", style="bold cyan"))
