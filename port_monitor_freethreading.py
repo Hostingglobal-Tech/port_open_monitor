@@ -264,29 +264,47 @@ class FreeThreadingPortMonitor:
         return Path(cwd).name if cwd else 'Unknown'
 
     def display_ports_with_actions(self, ports_info: List[Dict]):
-        """포트 정보를 테이블로 표시"""
+        """포트 정보를 테이블로 표시 (모바일 자동 감지)"""
         # ANSI escape: 화면 지우고 커서를 맨 위로 이동 (tmux 호환)
         sys.stdout.write('\033[2J\033[H')
         sys.stdout.flush()
+
+        # 터미널 폭 감지하여 모바일/PC 모드 결정
+        try:
+            term_width = os.get_terminal_size().columns
+        except:
+            term_width = 80  # 기본값
+
+        is_mobile = term_width < 80  # 80컬럼 미만이면 모바일 모드
 
         # 헤더 정보
         header_text = f"🚀 Port Monitor ({self.port_range[0]}-{self.port_range[1]})"
         console.print(Panel(header_text, style="bold cyan"))
 
         # 타임스탬프
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        console.print(f"[dim]Last updated: {timestamp}[/dim]")
-        console.print(f"[dim]Usage: Type process No. (e.g., 1, 10, 15) and press Enter to kill[/dim]\n")
+        timestamp = time.strftime("%H:%M:%S" if is_mobile else "%Y-%m-%d %H:%M:%S")
+        console.print(f"[dim]{timestamp}[/dim]")
+        if not is_mobile:
+            console.print(f"[dim]Usage: Type process No. and press Enter to kill[/dim]")
+        console.print("")
 
-        # 테이블
+        # 테이블 (모바일: 간소화, PC: 전체 정보)
         table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("No.", style="bold white", width=5)
-        table.add_column("Port", style="cyan", width=8)
-        table.add_column("Project Folder", style="bold green", width=30)
-        table.add_column("PID", style="yellow", width=8)
-        table.add_column("Process", style="blue", width=20)
-        table.add_column("Memory", style="red", width=10)
-        table.add_column("User", style="magenta", width=12)
+
+        if is_mobile:
+            # 모바일 모드: No., Port, Project만 표시
+            table.add_column("No.", style="bold white", width=3)
+            table.add_column("Port", style="cyan", width=5)
+            table.add_column("Project", style="bold green")
+        else:
+            # PC 모드: 전체 정보 표시
+            table.add_column("No.", style="bold white", width=5)
+            table.add_column("Port", style="cyan", width=8)
+            table.add_column("Project Folder", style="bold green", width=30)
+            table.add_column("PID", style="yellow", width=8)
+            table.add_column("Process", style="blue", width=20)
+            table.add_column("Memory", style="red", width=10)
+            table.add_column("User", style="magenta", width=12)
 
         for idx, port in enumerate(sorted(ports_info, key=lambda x: x['port']), 1):
             if port['project_folder'] != 'Unknown':
@@ -294,18 +312,25 @@ class FreeThreadingPortMonitor:
             else:
                 folder_display = "[dim]Unknown[/dim]"
 
-            table.add_row(
-                str(idx),
-                str(port['port']),
-                folder_display,
-                str(port['pid']) if port['pid'] else "N/A",
-                port['process_name'][:20],
-                str(port['memory']),
-                port['user']
-            )
+            if is_mobile:
+                table.add_row(
+                    str(idx),
+                    str(port['port']),
+                    folder_display
+                )
+            else:
+                table.add_row(
+                    str(idx),
+                    str(port['port']),
+                    folder_display,
+                    str(port['pid']) if port['pid'] else "N/A",
+                    port['process_name'][:20],
+                    str(port['memory']),
+                    port['user']
+                )
 
         console.print(table)
-        console.print(f"\n[bold]Total ports in use:[/bold] {len(ports_info)}")
+        console.print(f"\n[bold]Total:[/bold] {len(ports_info)}")
         console.print("")  # 카운트다운과 구분용 빈 줄
 
         return ports_info

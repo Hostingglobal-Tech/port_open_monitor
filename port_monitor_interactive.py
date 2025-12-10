@@ -131,54 +131,87 @@ class InteractivePortMonitor:
         return Path(cwd).name if cwd else 'Unknown'
     
     def display_ports_with_actions(self, ports_info: List[Dict]):
-        """포트 정보를 테이블로 표시"""
+        """포트 정보를 테이블로 표시 (모바일 자동 감지)"""
         # ANSI escape: 화면 지우고 커서를 맨 위로 이동 (tmux 호환)
         sys.stdout.write('\033[2J\033[H')
         sys.stdout.flush()
-        
+
+        # 터미널 폭 감지하여 모바일/PC 모드 결정
+        try:
+            term_width = os.get_terminal_size().columns
+        except:
+            term_width = 80  # 기본값
+
+        is_mobile = term_width < 80  # 80컬럼 미만이면 모바일 모드
+
         # 헤더
         console.print(Panel(f"🔄 Port Monitor ({self.port_range[0]}-{self.port_range[1]})", style="bold cyan"))
-        
+
         # 현재 시간
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        console.print(f"[dim]Last updated: {timestamp}[/dim]\n")
-        
+        timestamp = time.strftime("%H:%M:%S" if is_mobile else "%Y-%m-%d %H:%M:%S")
+        console.print(f"[dim]{timestamp}[/dim]")
+        if not is_mobile:
+            console.print(f"[dim]Usage: Type process No. and press Enter to kill[/dim]")
+        console.print("")
+
         # 숨긴 포트 제외하고 필터링
         visible_ports = [p for p in ports_info if p['port'] not in self.hidden_ports]
-        
+
         # 숨긴 포트가 있으면 표시
         if self.hidden_ports:
-            console.print(f"[yellow]Hidden ports: {', '.join(map(str, sorted(self.hidden_ports)))}[/yellow]")
-            console.print(f"[dim]Press 'u' to unhide all, or 's' + number to show specific port[/dim]\n")
-        
-        # 테이블 - PID를 No. 바로 다음에 배치
+            if is_mobile:
+                console.print(f"[yellow]Hidden: {len(self.hidden_ports)}[/yellow]")
+            else:
+                console.print(f"[yellow]Hidden ports: {', '.join(map(str, sorted(self.hidden_ports)))}[/yellow]")
+                console.print(f"[dim]Press 'u' to unhide all, or 's' + number to show specific port[/dim]")
+            console.print("")
+
+        # 테이블 (모바일: 간소화, PC: 전체 정보)
         table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("No.", style="bold white", min_width=3, no_wrap=True)      # 번호는 절대 잘리지 않음
-        table.add_column("PID", style="yellow", min_width=8, no_wrap=True)          # PID는 No. 바로 다음, 절대 잘리지 않음
-        table.add_column("Port", style="cyan", min_width=5, no_wrap=True)           # 포트 번호도 잘리지 않음
-        table.add_column("Project Folder", style="bold green", width=30)            # 프로젝트 폴더는 좀 더 작게
-        table.add_column("Process", style="blue", width=18)                         # 프로세스명은 조금 더 작게
-        table.add_column("Memory", style="red", width=10)                           # 메모리 정보
-        table.add_column("User", style="magenta", width=10)                         # 사용자명
-        
+
+        if is_mobile:
+            # 모바일 모드: No., Port, Project만 표시
+            table.add_column("No.", style="bold white", width=3)
+            table.add_column("Port", style="cyan", width=5)
+            table.add_column("Project", style="bold green")
+        else:
+            # PC 모드: 전체 정보 표시
+            table.add_column("No.", style="bold white", min_width=3, no_wrap=True)
+            table.add_column("PID", style="yellow", min_width=8, no_wrap=True)
+            table.add_column("Port", style="cyan", min_width=5, no_wrap=True)
+            table.add_column("Project Folder", style="bold green", width=30)
+            table.add_column("Process", style="blue", width=18)
+            table.add_column("Memory", style="red", width=10)
+            table.add_column("User", style="magenta", width=10)
+
         for idx, port in enumerate(sorted(visible_ports, key=lambda x: x['port']), 1):
             if port['project_folder'] != 'Unknown':
                 folder_display = f"[bold green]{port['project_folder']}[/bold green]"
             else:
                 folder_display = "[dim]Unknown[/dim]"
-            
-            table.add_row(
-                str(idx),
-                str(port['pid']) if port['pid'] else "N/A",
-                str(port['port']),
-                folder_display,
-                port['process_name'][:18] if len(port['process_name']) > 18 else port['process_name'],  # 18자로 제한
-                str(port['memory']),
-                port['user']
-            )
-        
+
+            if is_mobile:
+                table.add_row(
+                    str(idx),
+                    str(port['port']),
+                    folder_display
+                )
+            else:
+                table.add_row(
+                    str(idx),
+                    str(port['pid']) if port['pid'] else "N/A",
+                    str(port['port']),
+                    folder_display,
+                    port['process_name'][:18] if len(port['process_name']) > 18 else port['process_name'],
+                    str(port['memory']),
+                    port['user']
+                )
+
         console.print(table)
-        console.print(f"\n[bold]Total ports:[/bold] {len(visible_ports)} visible, {len(self.hidden_ports)} hidden")
+        if is_mobile:
+            console.print(f"\n[bold]Total:[/bold] {len(visible_ports)}")
+        else:
+            console.print(f"\n[bold]Total ports:[/bold] {len(visible_ports)} visible, {len(self.hidden_ports)} hidden")
         console.print("")  # 카운트다운과 구분을 위한 빈 줄
 
         return visible_ports
