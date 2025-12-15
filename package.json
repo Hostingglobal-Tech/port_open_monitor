@@ -1,0 +1,47 @@
+{
+  "name": "@private/port-open-monitor",
+  "private": true,
+  "version": "1.0.0",
+  "description": "🚀 Port monitoring tool for development environments. Monitor TCP ports 3000-9000 with project folder detection and interactive process management.",
+  "main": "index.js",
+  "bin": {
+    "port-monitor": "./bin/port-monitor.js",
+    "pm-port": "./bin/port-monitor.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install": "node install.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Hostingglobal-Tech/port-open-monitor.git"
+  },
+  "keywords": [
+    "port",
+    "monitor",
+    "development",
+    "process",
+    "tcp",
+    "networking",
+    "cli",
+    "python",
+    "devtools",
+    "process-management"
+  ],
+  "author": "Hostingglobal-Tech",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Hostingglobal-Tech/port-open-monitor/issues"
+  },
+  "homepage": "https://github.com/Hostingglobal-Tech/port-open-monitor#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "preferGlobal": true,
+  "os": [
+    "linux",
+    "darwin"
+  ],
+  "dependencies": {},
+  "devDependencies": {}
+}
