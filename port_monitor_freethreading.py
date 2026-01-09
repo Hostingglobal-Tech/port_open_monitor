@@ -90,18 +90,26 @@ class FreeThreadingPortMonitor:
     }
 
     def get_friendly_app_name(
-        self, process_name: str, project_folder: str, app_name: Optional[str]
+        self,
+        process_name: str,
+        project_folder: str,
+        app_name: Optional[str],
+        description: Optional[str] = None,
     ) -> str:
-        """친숙한 앱 이름 생성 (시스템 서비스, 일반 폴더명 처리)"""
+        """친숙한 앱 이름 생성 (시스템 서비스, 설명, 폴더명 처리)"""
         # 1. 시스템 서비스 체크
         if process_name in self.SYSTEM_SERVICES:
             return self.SYSTEM_SERVICES[process_name]
+
+        # 2. 프로젝트 설명이 있으면 우선 사용 (가장 명확한 정보)
+        if description:
+            return description
 
         folder_parts = (
             project_folder.split("/") if project_folder and project_folder != "Unknown" else []
         )
 
-        # 2. package.json의 name이 있으면 사용 (단, 일반적인 이름이면 상위 폴더 추가)
+        # 3. package.json의 name이 있으면 사용 (단, 일반적인 이름이면 상위 폴더 추가)
         if app_name and app_name != "Unknown":
             # 일반적인 이름이고 상위 폴더가 있으면 "상위/앱명" 형태
             if app_name.lower() in self.GENERIC_APP_NAMES and len(folder_parts) >= 2:
@@ -109,11 +117,11 @@ class FreeThreadingPortMonitor:
                 return f"{parent_folder}/{app_name}"
             return app_name
 
-        # 3. 프로젝트 폴더가 Unknown이면 프로세스명 반환
+        # 4. 프로젝트 폴더가 Unknown이면 프로세스명 반환
         if project_folder == "Unknown" or not project_folder:
             return process_name if process_name != "Unknown" else "Unknown"
 
-        # 4. 폴더 경로에서 친숙한 이름 생성 (동적 감지)
+        # 5. 폴더 경로에서 친숙한 이름 생성 (동적 감지)
         last_folder = folder_parts[-1] if folder_parts else ""
 
         # 폴더가 2개 이상이면 항상 "상위/마지막" 형태로 표시 (더 명확한 식별)
@@ -161,6 +169,85 @@ class FreeThreadingPortMonitor:
             current = current.parent
         return None
 
+    def get_project_description(self, cwd: str) -> Optional[str]:
+        """프로젝트 설명 추출 (package.json, pyproject.toml, Python docstring, README)"""
+        if not cwd or cwd == "Unknown":
+            return None
+
+        current = Path(cwd)
+
+        # 1. package.json description
+        for _ in range(3):
+            package_json = current / "package.json"
+            if package_json.exists():
+                try:
+                    import json
+
+                    with open(package_json, "r") as f:
+                        data = json.load(f)
+                        desc = data.get("description")
+                        if desc:
+                            return desc[:25]  # 최대 25자
+                except:
+                    pass
+            if current.parent == current:
+                break
+            current = current.parent
+
+        current = Path(cwd)
+
+        # 2. pyproject.toml description
+        for _ in range(3):
+            pyproject = current / "pyproject.toml"
+            if pyproject.exists():
+                try:
+                    with open(pyproject, "r") as f:
+                        content = f.read()
+                        # [project] 섹션의 description 찾기
+                        match = re.search(r'description\s*=\s*["\']([^"\']+)["\']', content)
+                        if match:
+                            return match.group(1)[:25]
+                except:
+                    pass
+            if current.parent == current:
+                break
+            current = current.parent
+
+        # 3. Python main.py 또는 app.py docstring
+        for py_name in ["main.py", "app.py", "__init__.py"]:
+            py_file = Path(cwd) / py_name
+            if py_file.exists():
+                try:
+                    with open(py_file, "r") as f:
+                        content = f.read(1000)  # 첫 1000자
+                        # 트리플 쿼트 docstring 찾기 (""" 또는 ''')
+                        match = re.search(
+                            r'^\s*(?:#[^\n]*\n)*\s*["\']["\']["\']([^"\']+)', content, re.MULTILINE
+                        )
+                        if match:
+                            # 첫 줄만 추출하고 길이 제한
+                            first_line = match.group(1).strip().split("\n")[0]
+                            return first_line[:25]
+                except:
+                    pass
+
+        # 4. README.md 첫 줄
+        for readme_name in ["README.md", "readme.md", "README.txt"]:
+            readme = Path(cwd) / readme_name
+            if readme.exists():
+                try:
+                    with open(readme, "r") as f:
+                        first_line = f.readline().strip()
+                        # # 제목 제거
+                        if first_line.startswith("#"):
+                            first_line = first_line.lstrip("#").strip()
+                        if first_line:
+                            return first_line[:25]
+                except:
+                    pass
+
+        return None
+
     def get_process_details_single(self, pid: int) -> Dict:
         """단일 프로세스의 상세 정보 가져오기"""
         try:
@@ -173,11 +260,13 @@ class FreeThreadingPortMonitor:
 
             cwd = process.cwd()
             app_name = self.get_app_name_from_package_json(cwd)
+            description = self.get_project_description(cwd)
 
             return {
                 "pid": pid,
                 "cwd": cwd,
                 "app_name": app_name,
+                "description": description,
                 "cmdline": cmdline_str,
                 "memory": f"{process.memory_info().rss / 1024 / 1024:.1f}MB",
                 "cpu": f"{process.cpu_percent():.1f}%",
@@ -188,6 +277,7 @@ class FreeThreadingPortMonitor:
                 "pid": pid,
                 "cwd": "Unknown",
                 "app_name": None,
+                "description": None,
                 "cmdline": "",
                 "memory": "N/A",
                 "cpu": "N/A",
@@ -246,6 +336,7 @@ class FreeThreadingPortMonitor:
                         "process_name": process_name,
                         "project_folder": project_folder,
                         "app_name": process_info.get("app_name"),
+                        "description": process_info.get("description"),
                         "cwd": process_info.get("cwd", "Unknown"),
                         "cmdline": process_info.get("cmdline", ""),
                         "memory": process_info.get("memory", "N/A"),
@@ -328,6 +419,7 @@ class FreeThreadingPortMonitor:
                             process_details_map[pid] = {
                                 "pid": pid,
                                 "cwd": "Unknown",
+                                "description": None,
                                 "cmdline": "",
                                 "memory": "N/A",
                                 "cpu": "N/A",
@@ -347,6 +439,7 @@ class FreeThreadingPortMonitor:
                         **basic_info,
                         "project_folder": project_folder,
                         "app_name": process_info.get("app_name"),
+                        "description": process_info.get("description"),
                         "cwd": process_info.get("cwd", "Unknown"),
                         "cmdline": process_info.get("cmdline", ""),
                         "memory": process_info.get("memory", "N/A"),
@@ -438,11 +531,12 @@ class FreeThreadingPortMonitor:
             table.add_column("User", style="magenta", width=10)
 
         for idx, port in enumerate(sorted(ports_info, key=lambda x: x["port"]), 1):
-            # 친숙한 앱 이름 생성 (시스템 서비스, 일반 폴더명 처리)
+            # 친숙한 앱 이름 생성 (시스템 서비스, 설명, 폴더명 처리)
             app_name = self.get_friendly_app_name(
                 port.get("process_name", "Unknown"),
                 port.get("project_folder", "Unknown"),
                 port.get("app_name"),
+                port.get("description"),
             )
 
             app_display = (
